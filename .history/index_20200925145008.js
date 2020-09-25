@@ -48,8 +48,7 @@ app.get('/subscription/:cpf', function (req, res) {
                         message: 'Você não possui uma assinatura PRIME.',
                         statusCode: 110,
                         data: null
-                    }));
-                }
+                    }));        }
             })
             .then(resp => {
                 var findActiveCustomer = false;
@@ -94,15 +93,11 @@ app.get('/subscription/:cpf', function (req, res) {
                             });
 
                             if (activeSubs.length === 0) {
-
-                                //Usuário de subsincrições ativas.
-
                                 res.status(404).end(JSON.stringify({
                                     message: 'Não foi encontrada subinscrições ativas',
                                     statusCode: 404,
                                     data: []
                                 }));
-
                             } else {
                                 return activeSubs;
                             }
@@ -113,9 +108,9 @@ app.get('/subscription/:cpf', function (req, res) {
 
                             if (activeSubscribe[0] !== undefined) {
                                 subsResponse = createSubsBody(activeSubscribe[0]);
-
-                                //console.log("subsResponse", subsResponse);
-
+                                
+                                console.log("subsResponse", subsResponse);
+                                
                                 return subsResponse;
                             } else {
                                 res.status(404).end(JSON.stringify({
@@ -218,10 +213,10 @@ app.post('/subscription', function (req, res) {
     var validationMsg = callValidators(reqBody, reqHeader);
     //console.log(validationMsg);
 
-    if (reqBody.test !== undefined && reqBody.test === true) {
+    if(reqBody.test !== undefined && reqBody.test === true){
         console.log('Modo teste');
         testModeActive = true;
-    }
+    } 
 
     if (validationMsg === null) {
         let promises = [];
@@ -234,7 +229,7 @@ app.post('/subscription', function (req, res) {
                 //console.log("vResult:", vResult);
                 customerInfo = vResult[0];
                 addressInfo = vResult[1];
-                if (customerInfo === null && addressInfo === null) {
+                if(customerInfo === null && addressInfo === null){
                     res.status(400).end(JSON.stringify({
                         message: 'Token inválido',
                         statusCode: 99,
@@ -255,27 +250,15 @@ app.post('/subscription', function (req, res) {
                     .then((checkResult) => {
                         // console.log(JSON.stringify(checkResult.customers));
 
-                        let customerIsActive = false;
-
                         if (checkResult.customers.length > 0) {
-
-                            // VERIFICA SE O STATUS DO CLIENTE ESTA ATIVO
-                            checkCustomer.customer.forEach(customer => {
-                                if (customer.status === 'active') {
-                                    customerIsActive = true;
-                                }
-                            });
-
-                            // SE ELE NAO ESTA ATIVO ENTAO POSSO AVANCAR
-                            if (customerIsActive) {
+                            if (testModeActive === true) {
+                                return vResult;
+                            } else {
                                 res.status(400).end(JSON.stringify({
                                     message: 'Esse usuário já possuí uma assinatura',
                                     statusCode: 50,
                                     data: null
                                 }));
-
-                            } else {
-                                return vResult;
                             }
                         } else {
                             return vResult;
@@ -382,7 +365,7 @@ app.post('/subscription', function (req, res) {
                                                     statusCode: 100,
                                                     data: null
                                                 }));
-                                            }
+                                            } 
                                         });
                                 } else {
                                     //return subscribeResult;
@@ -1028,13 +1011,12 @@ function createVindiCustomerObj(reqBody, customerInfo, addressInfo) {
     // console.log(registryCode);
 
     var phoneNumber = addressInfo.telephone.replace('(', '').replace(')', '').replace('-', '').trim();
-
     return {
         "name": customerInfo.name,
         "email": reqBody.email,
         "registry_code": customerInfo.cpf, //cpf
         "code": registryCode,
-        "notes": customerInfo.rg,
+        "notes": "",
         "address": {
             "street": addressInfo.streetName,
             "number": addressInfo.number,
