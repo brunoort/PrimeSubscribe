@@ -43,8 +43,8 @@ app.get('/subscription/:cpf', function (req, res) {
                     return allCustomerResult;
                 } else {
 
-                    res.status(404).end(JSON.stringify({
-                        message: 'Você não possui uma `assinatura PRIME.',
+                    res.status(400).end(JSON.stringify({
+                        message: 'Você não possui uma `assinatura PRI`ME.',
                         statusCode: 110,
                         data: null
                     }));
@@ -54,30 +54,23 @@ app.get('/subscription/:cpf', function (req, res) {
                 var findActiveCustomer = false;
                 let selCustomer = [];
 
-                // resp.customers.forEach(customer => {
-                //     //console.log(customer);
-                //     if (customer.status === "active") {
-                //         findActiveCustomer = true;
-                //         selCustomer.push(customer);
-                //     }
-                // })
+                resp.customers.forEach(customer => {
+                    //console.log(customer);
+                    if (customer.status === "active") {
+                        findActiveCustomer = true;
+                        selCustomer.push(customer);
+                    }
+                })
 
-                // if (findActiveCustomer === false) {
-
-                //     console.log(customerResponse);
-
-                //     res.status(404).end(JSON.stringify({
-                //         message: 'Não foi encontrada contas ativas',
-                //         statusCode: 404,
-                //         data: []
-                //     }));
-
-                // } else {
-                //     return selCustomer;
-                // }
-
-                selCustomer.push(resp.customers[0]);
-                return selCustomer;
+                if (findActiveCustomer === false) {
+                    res.status(404).end(JSON.stringify({
+                        message: 'Não foi encontrada contas ativas',
+                        statusCode: 404,
+                        data: []
+                    }));
+                } else {
+                    return selCustomer;
+                }
 
             })
             .then(selectedCustomer => {
@@ -90,46 +83,47 @@ app.get('/subscription/:cpf', function (req, res) {
                     console.log("customerId", customerId);
                     getCustomerSubsById(customerId)
                         .then(customerRes => {
-
+                            //console.log("customeRes Subscriptions", customerRes);
                             let activeSubs = [];
 
-                            //console.log(customerRes.subscriptions);
-
-                            if (customerRes.subscriptions.length > 0) {
-                                customerRes.subscriptions.forEach(subs => {
-                                    if (subs.status === 'active') {
-                                        activeSubs.push(subs);
-                                    }
-                                });
-
-                                if (activeSubs.length === 0) {
-                                    const subSize = customerRes.subscriptions.length;
-                                    const subs = customerRes.subscriptions[0];
+                            customerRes.subscriptions.forEach(subs => {
+                                if (subs.status === 'active') {
                                     activeSubs.push(subs);
                                 }
+                            });
 
-                                return activeSubs;
-
-                            } else {
+                            if (activeSubs.length === 0) {
                                 res.status(404).end(JSON.stringify({
-                                    message: 'Você não possuí uma assinatura PRIME',
+                                    message: 'Não foi encontrada subinscrições ativas',
                                     statusCode: 404,
                                     data: []
                                 }));
-                                return Promise.reject();
+                            } else {
+                                return activeSubs;
                             }
 
                         })
                         .then(activeSubscribe => {
                             //console.log("accf", activeSubscribe);
-                            subsResponse = createSubsBody(activeSubscribe[0]);
-                            //console.log("subsResponse", subsResponse);
-                            return subsResponse;
+
+                            if (activeSubscribe[0] !== undefined) {
+                                subsResponse = createSubsBody(activeSubscribe[0]);
+
+                                console.log("subsResponse", subsResponse);
+
+                                return subsResponse;
+                            } else {
+                                res.status(404).end(JSON.stringify({
+                                    message: 'Não foi encontrada contas ativas',
+                                    statusCode: 404,
+                                    data: []
+                                }));
+                            }
                         })
                         .then(() => {
                             getCustomerBills(customerId)
                                 .then(billsRes => {
-                                    //console.log("billsRes", billsRes);
+                                    // console.log("billsRes", billsRes);
                                     billsResponse = createBillsBody(billsRes);
                                 })
                                 .then(() => {
@@ -151,15 +145,11 @@ app.get('/subscription/:cpf', function (req, res) {
                                         .then(() => {
 
                                             //clean result
-                                            //console.log('subs', subsResponse);
-
-                                            if (subsResponse.status === 'active') {
-                                                delete subsResponse.plan.code;
-                                                delete subsResponse.current_period.id;
-                                                delete subsResponse.current_period.billing_at;
-                                                delete subsResponse.current_period.cycle;
-                                                delete subsResponse.current_period.duration;
-                                            }
+                                            delete subsResponse.plan.code;
+                                            delete subsResponse.current_period.id;
+                                            delete subsResponse.current_period.billing_at;
+                                            delete subsResponse.current_period.cycle;
+                                            delete subsResponse.current_period.duration;
 
                                             billsResponse.forEach(billSub => {
                                                 delete billSub.subscription.code;
@@ -175,7 +165,7 @@ app.get('/subscription/:cpf', function (req, res) {
                         })
                         .catch((err) => {
                             res.status(400).end(JSON.stringify({
-                                message: 'Não foi possível recuperar sua assinatura',
+                                message: 'Não foi possível recuperar sua assinatura, ' + err.message,
                                 statusCode: 120,
                                 data: []
                             }));
@@ -485,48 +475,23 @@ function formatDateExpiration(date) {
 
 function formatingResponse(customerResponse, subsResponse, billsResponse, installationResponse, beneficitsResponse) {
 
-
-    var vPlan = null;
-    if (subsResponse.plan !== null) {
-        vPlan = {
-            id: subsResponse.plan.id,
-            name: subsResponse.plan.name,
-            benefits: null
-        }
-
-        //Beneficios
-        //console.log(subsResponse.plan.id)
-        //console.log(beneficitsResponse);
-
-        beneficitsResponse.forEach(plan => {
-            if (parseInt(plan.partner.planId) === parseInt(subsResponse.plan.id)) {
-                //console.log(plan.benefits);
-                vPlan.benefits = plan.benefits;
-            }
-        });
-    } else {
-        // console.log(subsResponse.id)
-        // console.log(billsResponse);
-
-        billsResponse.forEach(bill => {
-            if (bill.subscription.id === subsResponse.id) {
-                vPlan = {
-                    id: bill.subscription.plan.id,
-                    name: bill.subscription.plan.name,
-                    benefits: null
-                }
-            }
-
-            beneficitsResponse.forEach(plan => {
-                if (parseInt(plan.partner.planId) === parseInt(bill.subscription.plan.id)) {
-                    //console.log(plan.benefits);
-                    vPlan.benefits = plan.benefits;
-                }
-            });
-        });
+    //console.log(subsResponse.plan);
+    const vPlan = {
+        id: subsResponse.plan.id,
+        name: subsResponse.plan.name,
+        benefits: null
     }
 
+    //Beneficios
+    //console.log(subsResponse.plan.id)
+    //console.log(beneficitsResponse);
 
+    beneficitsResponse.forEach(plan => {
+        if (parseInt(plan.partner.planId) === parseInt(subsResponse.plan.id)) {
+            console.log(plan.benefits);
+            vPlan.benefits = plan.benefits;
+        }
+    });
 
     //Subscription
     const newSubsResp = {
@@ -670,48 +635,36 @@ function createBillsBody(billResponse) {
 }
 
 function createSubsBody(subsResponse) {
-    try {
-        //console.log("subsResponse", subsResponse);
-        var vPlan = null;
-        var vPrice = null;
+    console.log("subsResponse", subsResponse);
 
-        if (subsResponse.status === 'active') {
-            vPrice = getPrice(subsResponse.product_items[0].pricing_schema);
-            vPlan = subsResponse.plan;
-        } else {
-            vPrice = null;
-            vPlan = null;
-        }
+    var vPrice = getPrice(subsResponse.product_items[0].pricing_schema);
+    var vInstallments = subsResponse.installments;
 
-        var vInstallments = subsResponse.installments;
 
-        var vPaymentProfile = {
-            card_expiration: subsResponse.payment_profile.card_expiration,
-            card_number_first_six: subsResponse.payment_profile.card_number_first_six,
-            card_number_last_four: subsResponse.payment_profile.card_number_last_four,
-            payment_company: subsResponse.payment_profile.payment_company
-        };
+    var vPaymentProfile = {
+        card_expiration: subsResponse.payment_profile.card_expiration,
+        card_number_first_six: subsResponse.payment_profile.card_number_first_six,
+        card_number_last_four: subsResponse.payment_profile.card_number_last_four,
+        payment_company: subsResponse.payment_profile.payment_company
+    };
 
-        delete vPaymentProfile.payment_company.id;
+    delete vPaymentProfile.payment_company.id;
 
-        return {
-            id: subsResponse.id,
-            status: convertStatus(subsResponse.status, subsResponse.overdue_since),
-            start_at: subsResponse.start_at,
-            end_at: subsResponse.end_at,
-            next_billing_at: subsResponse.next_billing_at,
-            plan: vPlan,
-            interval: subsResponse.interval,
-            interval_count: subsResponse.interval_count,
-            installments: subsResponse.installments,
-            price: vPrice,
-            monthlyPrice: getMonthlyPrice(vPrice, vInstallments),
-            current_period: subsResponse.current_period,
-            payment_profile: vPaymentProfile
+    return {
+        id: subsResponse.id,
+        status: convertStatus(subsResponse.status, subsResponse.overdue_since),
+        start_at: subsResponse.start_at,
+        end_at: subsResponse.end_at,
+        next_billing_at: subsResponse.next_billing_at,
+        plan: subsResponse.plan,
+        interval: subsResponse.interval,
+        interval_count: subsResponse.interval_count,
+        installments: subsResponse.installments,
+        price: vPrice,
+        monthlyPrice: getMonthlyPrice(vPrice, vInstallments),
+        current_period: subsResponse.current_period,
+        payment_profile: vPaymentProfile
 
-        }
-    } catch (err) {
-        console.log(err.message);
     }
 }
 
@@ -731,17 +684,15 @@ function convertStatus(status, overdue) {
     switch (status) {
         case 'active':
             if (overdue === null || overdue === '') {
-                return 'active';
+                return 'Ativo';
             } else {
-                return 'inactive';
+                return 'Inativo';
             }
             break;
-        case 'canceled':
-            return 'canceled'
-            break;
+        case canceled:
+            return 'Cancelado'
         default:
-            return 'inactive'
-            break;
+            return 'Inativo'
     }
 }
 
